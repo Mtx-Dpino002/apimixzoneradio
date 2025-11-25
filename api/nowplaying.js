@@ -1,53 +1,42 @@
-import fetch from "node-fetch";
-import xml2js from "xml2js";
-
-const PLAYBACK_URL = "https://api.mixzoneapp.cl/?pass=sSCDEkX9rB&action=playbackinfo";
-const COVER_URL = "https://api.mixzoneapp.cl/?pass=sSCDEkX9rB&action=trackartwork";
-const STREAM_URL = "https://live.mixzoneapp.cl/stream";
+import fetch from 'node-fetch';
+import xml2js from 'xml2js';
 
 export default async function handler(req, res) {
   try {
-    // Obtener el XML desde tu API
-    const xmlResponse = await fetch(PLAYBACK_URL);
+    const xmlUrl = "https://api.mixzoneapp.cl/?pass=sSCDEkX9rB&action=playbackinfo";
+    const coverUrl = "https://api.mixzoneapp.cl/?pass=sSCDEkX9rB&action=trackartwork";
+    const streamUrl = "https://live.mixzoneapp.cl/stream";
+
+    // Obtener el XML
+    const xmlResponse = await fetch(xmlUrl);
     const xmlText = await xmlResponse.text();
 
-    // Convertir XML → JSON
-    const result = await xml2js.parseStringPromise(xmlText, { explicitArray: false });
+    // Parsear XML
+    const parsed = await xml2js.parseStringPromise(xmlText, { explicitArray: false });
 
-    const track = result.Info.CurrentTrack.TRACK;
+    // Extraer TRACK actual
+    const track = parsed?.Info?.CurrentTrack?.TRACK;
 
-    // ARTISTA
-    let artist = track.ARTIST || "";
-    if (!artist && track.FILENAME) {
-      const filename = track.FILENAME.split("\\").pop();
-      if (filename.includes(" - ")) {
-        artist = filename.split(" - ")[0];
-      }
-    }
+    const artist = track?.$.ARTIST || "";
+    const title = track?.$.TITLE || "";
+    const album = track?.$.ALBUM || "";
+    const castTitle = track?.$.CASTTITLE || `${artist} - ${title}`;
 
-    // TÍTULO
-    const title = track.TITLE || track.ITEMTITLE || "";
-
-    // ÁLBUM
-    const album = track.ALBUM || "";
-
-    // CAST TITLE
-    const castTitle = track.CASTTITLE || title;
-
-    // Respuesta final
-    const data = {
+    res.status(200).json({
       artist,
       title,
       album,
       castTitle,
-      cover: COVER_URL,
-      stream: STREAM_URL,
+      cover: coverUrl,
+      stream: streamUrl,
       updatedAt: new Date().toISOString()
-    };
-
-    res.status(200).json(data);
+    });
 
   } catch (error) {
-    res.status(500).json({ error: "Error procesando XML" });
+    res.status(500).json({
+      error: "Error parsing XML",
+      details: error.toString()
+    });
   }
 }
+
